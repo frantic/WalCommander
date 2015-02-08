@@ -125,7 +125,7 @@ int FSSftp::CheckSession( int* err, FSCInfo* info )
 				userName = FSString( sys_charset_id, ret );
 				_operParam.user = userName.GetUnicode();
 
-				MutexLock infoLock( &infoMutex );
+				std::lock_guard<std::mutex> infoLock( &infoMutex );
 				_infoParam.user = userName.GetUnicode();
 			}
 		};
@@ -374,7 +374,7 @@ FSString FSSftp::StrError( int err )
 
 int FSSftp::OpenRead ( FSPath& path, int* err, FSCInfo* info )
 {
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 	int ret = CheckSession( err, info );
 
 	if ( ret ) { return ret; }
@@ -407,7 +407,7 @@ int FSSftp::OpenRead ( FSPath& path, int* err, FSCInfo* info )
 
 int FSSftp::OpenCreate  ( FSPath& path, bool overwrite, int mode, int* err, FSCInfo* info )
 {
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 	int ret = CheckSession( err, info );
 
 	if ( ret ) { return ret; }
@@ -462,7 +462,7 @@ int FSSftp::OpenCreate  ( FSPath& path, bool overwrite, int mode, int* err, FSCI
 
 int FSSftp::Close ( int fd, int* err, FSCInfo* info )
 {
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 	int ret = CheckSession( err, info );
 
 	if ( ret ) { return ret; }
@@ -489,7 +489,7 @@ int FSSftp::Close ( int fd, int* err, FSCInfo* info )
 
 int FSSftp::Read  ( int fd, void* buf, int size, int* err, FSCInfo* info )
 {
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 
 	int ret = CheckSession( err, info ); //???
 
@@ -553,7 +553,7 @@ int FSSftp::Read  ( int fd, void* buf, int size, int* err, FSCInfo* info )
 
 int FSSftp::Write ( int fd, void* buf, int size, int* err, FSCInfo* info )
 {
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 
 	int ret = CheckSession( err, info ); //???
 
@@ -611,7 +611,7 @@ int FSSftp::Write ( int fd, void* buf, int size, int* err, FSCInfo* info )
 
 int FSSftp::Rename   ( FSPath&  oldpath, FSPath& newpath, int* err,  FSCInfo* info )
 {
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 
 	int ret = CheckSession( err, info );
 
@@ -631,7 +631,7 @@ int FSSftp::Rename   ( FSPath&  oldpath, FSPath& newpath, int* err,  FSCInfo* in
 
 int FSSftp::MkDir ( FSPath& path, int mode, int* err,  FSCInfo* info )
 {
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 
 	int ret = CheckSession( err, info );
 
@@ -649,7 +649,7 @@ int FSSftp::MkDir ( FSPath& path, int mode, int* err,  FSCInfo* info )
 
 int FSSftp::Delete   ( FSPath& path, int* err, FSCInfo* info )
 {
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 
 	int ret = CheckSession( err, info );
 
@@ -667,7 +667,7 @@ int FSSftp::Delete   ( FSPath& path, int* err, FSCInfo* info )
 
 int FSSftp::RmDir ( FSPath& path, int* err, FSCInfo* info )
 {
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 
 	int ret = CheckSession( err, info );
 
@@ -685,7 +685,7 @@ int FSSftp::RmDir ( FSPath& path, int* err, FSCInfo* info )
 
 int FSSftp::SetFileTime ( FSPath& path, FSTime aTime, FSTime mTime, int* err, FSCInfo* info )
 {
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 
 	int ret = CheckSession( err, info );
 
@@ -713,7 +713,7 @@ int FSSftp::SetFileTime ( FSPath& path, FSTime aTime, FSTime mTime, int* err, FS
 
 int FSSftp::ReadDir  ( FSList* list, FSPath& path, int* err, FSCInfo* info )
 {
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 	int ret = CheckSession( err, info );
 
 	if ( ret ) { return ret; }
@@ -834,7 +834,7 @@ int FSSftp::ReadDir  ( FSList* list, FSPath& path, int* err, FSCInfo* info )
 
 int FSSftp::Stat  ( FSPath& path, FSStat* st, int* err, FSCInfo* info )
 {
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 	int ret = CheckSession( err, info );
 
 	if ( ret ) { return ret; }
@@ -893,7 +893,7 @@ int FSSftp::Stat  ( FSPath& path, FSStat* st, int* err, FSCInfo* info )
 
 int FSSftp::Symlink  ( FSPath& path, FSString& str, int* err, FSCInfo* info )
 {
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 	int ret = CheckSession( err, info );
 
 	if ( ret ) { return ret; }
@@ -912,7 +912,7 @@ int FSSftp::Symlink  ( FSPath& path, FSString& str, int* err, FSCInfo* info )
 
 FSString FSSftp::Uri( FSPath& path )
 {
-	MutexLock lock( &infoMutex ); //infoMutex!!!
+	std::lock_guard<std::mutex> lock( &infoMutex ); //infoMutex!!!
 
 	std::vector<char> a;
 

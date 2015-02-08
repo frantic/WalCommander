@@ -32,7 +32,7 @@ static FSCInfo* fscInfo = 0;
 static FSSmbParam* currentFsParam = 0;
 static FSSmbParam lastFsParam;
 
-#define FREPARE_SMB_OPER(lockname, infoname, param)   MutexLock lockname(&smbMutex); fscInfo = infoname; currentFsParam = param;
+#define FREPARE_SMB_OPER(lockname, infoname, param)   std::lock_guard<std::mutex> lockname(&smbMutex); fscInfo = infoname; currentFsParam = param;
 
 
 struct PathBuffer
@@ -164,7 +164,7 @@ static void smbcAuth( const char* srv, const char* shr,  char* wg, int wglen, ch
 
 static void InitSmb()
 {
-	MutexLock lock( &smbMutex );
+	std::lock_guard<std::mutex> lock( &smbMutex );
 
 	if ( smbCTX ) { return; }
 
@@ -485,7 +485,7 @@ int FSSmb::StatVfs( FSPath& path, FSStatVfs* vst, int* err, FSCInfo* info )
 
 FSString FSSmb::Uri( FSPath& path )
 {
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 	std::vector<char> a;
 
 	if ( _param.server[0] )

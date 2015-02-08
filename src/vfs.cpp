@@ -49,7 +49,7 @@ bool FSCInfo::Prompt( const unicode_t* header, const unicode_t* message, FSPromp
 FSCInfo::~FSCInfo() {}
 
 ////////////////////////////////////// FSCSimpleInfo
-bool FSCSimpleInfo::Stopped() {   MutexLock lock( &mutex ); return stopped; }
+bool FSCSimpleInfo::Stopped() {   std::lock_guard<std::mutex> lock( mutex ); return stopped; }
 FSCSimpleInfo::~FSCSimpleInfo() {}
 
 //////////////////////////////////////////////////  FSSys ///////////////////////////

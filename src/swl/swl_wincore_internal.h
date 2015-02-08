@@ -55,7 +55,7 @@ namespace wal
 
 	class WthInternalEvent
 	{
-		Mutex mutex;
+		std::mutex mutex;
 		volatile int fd[2];
 		volatile bool signaled;
 	public:
@@ -70,7 +70,7 @@ namespace wal
 
 		void SetSignal()
 		{
-			MutexLock lock( &mutex );
+			std::lock_guard<std::mutex> lock( mutex );
 
 			if ( signaled ) { return; }
 
@@ -86,7 +86,7 @@ namespace wal
 
 		void ClearSignal()
 		{
-			MutexLock lock( &mutex );
+			std::lock_guard<std::mutex> lock( mutex );
 
 			if ( !signaled ) { return; }
 

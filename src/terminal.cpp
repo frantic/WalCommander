@@ -434,7 +434,7 @@ int Terminal::ReadOutput( char* buf, int size )
 
 void Terminal::Output( const char c )
 {
-	MutexLock lock( &_outputMutex );
+	std::lock_guard<std::mutex> lock( &_outputMutex );
 	outQueue.Put( c );
 	_outputCond.Signal();
 }
@@ -443,7 +443,7 @@ void Terminal::Output( const char* s, int size )
 {
 	if ( size <= 0 ) { return; }
 
-	MutexLock lock( &_outputMutex );
+	std::lock_guard<std::mutex> lock( &_outputMutex );
 	outQueue.Put( s, size );
 	_outputCond.Signal();
 }
@@ -491,7 +491,7 @@ inline void Terminal::OutAppendUnicode( unicode_t c )
 
 void Terminal::UnicodeOutput( const unicode_t c )
 {
-	MutexLock lock( &_outputMutex );
+	std::lock_guard<std::mutex> lock( &_outputMutex );
 	OutAppendUnicode( c );
 	_outputCond.Signal();
 }
@@ -500,7 +500,7 @@ void Terminal::UnicodeOutput( const unicode_t* s, int size )
 {
 	if ( size <= 0 ) { return; }
 
-	MutexLock lock( &_outputMutex );
+	std::lock_guard<std::mutex> lock( &_outputMutex );
 
 	for ( ; size > 0; size--, s++ ) { OutAppendUnicode( *s ); }
 
@@ -510,13 +510,13 @@ void Terminal::UnicodeOutput( const unicode_t* s, int size )
 
 void Terminal::TerminalReset( bool clearScreen )
 {
-	MutexLock lock( &_inputMutex );
+	std::lock_guard<std::mutex> lock( &_inputMutex );
 	_emulator.Reset( clearScreen );
 }
 
 void Terminal::TerminalPrint( const unicode_t* str, unsigned fg, unsigned bg )
 {
-	MutexLock lock( &_inputMutex );
+	std::lock_guard<std::mutex> lock( &_inputMutex );
 	_emulator.InternalPrint( str, fg, bg );
 }
 
@@ -549,7 +549,7 @@ void* TerminalInputThreadFunc( void* data )
 				break; //eof
 			}
 
-			MutexLock lock( &terminal->_inputMutex );
+			std::lock_guard<std::mutex> lock( &terminal->_inputMutex );
 
 			for ( int i = 0; i < n; i++ )
 			{

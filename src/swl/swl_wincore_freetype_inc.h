@@ -260,7 +260,7 @@ namespace FTU
 
 	int FFace::Load( const char* fileName, int index, int size, int xRes, int yRes )
 	{
-		MutexLock lock( &mutex );
+		std::lock_guard<std::mutex> lock( mutex );
 
 		if ( !CheckLib() ) { return 1; }
 
@@ -430,7 +430,7 @@ namespace FTU
 
 	void FFace::OutTextF( wal::GC& gc, int x, int y, const  unicode_t* text, int count )
 	{
-		MutexLock lock( &mutex );
+		std::lock_guard<std::mutex> lock( mutex );
 
 		if ( !CheckLib() ) { return; }
 
@@ -446,7 +446,7 @@ namespace FTU
 
 	void FFace::OutText( wal::GC& gc, int x, int y, const  unicode_t* text, int count )
 	{
-		MutexLock lock( &mutex );
+		std::lock_guard<std::mutex> lock( mutex );
 
 		if ( !CheckLib() ) { return; }
 
@@ -485,7 +485,7 @@ namespace FTU
 
 	cpoint FFace::GetTextExtents( const unicode_t* text, int count )
 	{
-		MutexLock lock( &mutex );
+		std::lock_guard<std::mutex> lock( mutex );
 
 		if ( !CheckLib() ) { return cpoint( 0, 0 ); }
 

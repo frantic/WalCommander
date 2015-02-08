@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <mutex>
+
 #include "swl.h"
 
 using namespace wal;
@@ -25,11 +27,11 @@ class OperThreadNode
 	std::vector<char> threadInfo; //++volatile !!!
 	OperThreadNode* volatile prev, *volatile next;
 	volatile bool stopped;
-	Mutex mutex;
+	std::mutex mutex;
 	void* volatile data;
 
 	void* volatile cbData;
-	Cond cbCond;
+	std::condition_variable cbCond;
 	volatile int  cbRet;
 	OperCallback cbFunc;
 public:
@@ -39,7 +41,7 @@ public:
 		   cbData( 0 ), cbRet( -1 ), cbFunc( 0 )
 	{}
 
-	Mutex* GetMutex() { return &mutex; }
+	std::mutex& GetMutex() { return mutex; }
 
 	void* Data() { return data; } //можно вызывать и работать с данными только заблакировав mutex получаемый через GetMutex
 	bool NBStopped() { return stopped; } //можно вызывать только заблакировав mutex получаемый через GetMutex
@@ -48,7 +50,11 @@ public:
 
 	//!!! id >= 2
 	bool SendSignal( int id ) //обязательно запускать при НЕзалоченном mutex
-	{ MutexLock lock( &mutex ); if ( stopped || id <= 1 ) { return false; } return WinThreadSignal( id ); }
+	{
+		std::lock_guard<std::mutex> lock( mutex );
+		if ( stopped || id <= 1 ) { return false; }
+		return WinThreadSignal( id );
+	}
 
 	~OperThreadNode();
 private:

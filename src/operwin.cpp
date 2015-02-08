@@ -6,14 +6,14 @@
 
 #include "operwin.h"
 
-static Mutex operMutex; //блокировать при изменении operStopList, и при к threadId и tNode  в OperThreadWin !!!
+static std::mutex operMutex; //блокировать при изменении operStopList, и при к threadId и tNode  в OperThreadWin !!!
 
 static OperThreadNode* volatile operStopList = 0;
 
 
 int OperThreadNode::CallBack( OperCallback f, void* data )
 {
-	MutexLock lock( &mutex );
+	std::unique_lock<std::mutex> lock( mutex );
 	cbRet = -1;
 	cbData = data;
 	cbFunc = f;
@@ -23,7 +23,8 @@ int OperThreadNode::CallBack( OperCallback f, void* data )
 		return -1;
 	}
 
-	cbCond.Wait( &mutex );
+	cbCond.wait( lock );
+
 	return cbRet;
 }
 
@@ -36,20 +37,20 @@ OperThreadNode::~OperThreadNode()
 
 void OperThreadWin::DBGPrintStoppingList()
 {
-	MutexLock lock1( &operMutex );
+	std::lock_guard<std::mutex> lock1( operMutex );
 
 	OperThreadNode* p;
 
 	for ( p = operStopList; p; p = p->next )
 	{
-		MutexLock lock2( &p->mutex );
+		std::lock_guard<std::mutex> lock2( p->mutex );
 		printf( "stopped thread %s\n", p->threadInfo.data() ? p->threadInfo.data() : "<empty info>" );
 	}
 }
 
 void OperThreadWin::StopThread()
 {
-	MutexLock lock( &operMutex );
+	std::lock_guard<std::mutex> lock( operMutex );
 
 	if ( !tNode )
 	{
@@ -57,14 +58,14 @@ void OperThreadWin::StopThread()
 		return;
 	}
 
-	MutexLock lockNode( &tNode->mutex );
+	std::lock_guard<std::mutex> lockNode( tNode->mutex );
 	tNode->stopped = true;
 	tNode->data = 0;
 
 	if ( !this->cbExecuted ) //!!!
 	{
 		tNode->cbRet = -1;
-		tNode->cbCond.Signal(); // на всякий случай, вдруг сигнал о каллбаке послан, но сообщение еще до окна не дошло
+		tNode->cbCond.notify_all(); // на всякий случай, вдруг сигнал о каллбаке послан, но сообщение еще до окна не дошло
 	}
 
 	tNode->win = 0;
@@ -109,8 +110,8 @@ void* __123___OperThread( void* param )
 		fprintf( stderr, "__123___OperThread(): exception in OperThread!!!\n" );
 	}
 
-	MutexLock lock( &operMutex );
-	MutexLock lockNode( &pTp->node->mutex );
+	std::lock_guard<std::mutex> lock( operMutex );
+	std::unique_lock<std::mutex> lockNode( pTp->node->mutex );
 
 	if ( pTp->node->stopped )
 	{
@@ -135,7 +136,7 @@ void* __123___OperThread( void* param )
 	}
 
 	pTp->node->stopped = true; //!!!
-	lockNode.Unlock(); //!!!
+	lockNode.unlock(); //!!!
 
 #ifdef _DEBUG
 	printf( "stop: %s\n", pTp->node->threadInfo.data( ) );
@@ -160,7 +161,7 @@ void OperThreadWin::RunNewThread( const char* info, OperThreadFunc f, void* data
 	param->func = f;
 	param->node = tNode;
 
-	MutexLock lock( &operMutex );
+	std::lock_guard<std::mutex> lock( operMutex );
 
 	try
 	{
@@ -182,14 +183,14 @@ void OperThreadWin::ThreadSignal( int id, int data )
 {
 	if ( data == 1 )
 	{
-		MutexLock lock( &operMutex );
+		std::unique_lock<std::mutex> lock( operMutex );
 
 		if ( !tNode ) { return; } //уже остановлен и каллбаку послан согнал с отрицательным результатом
 
 		ASSERT( !cbExecuted );
 		cbExecuted = true;
 		OperThreadNode* p = tNode;
-		lock.Unlock();
+		lock.unlock();
 
 		try
 		{
@@ -200,9 +201,9 @@ void OperThreadWin::ThreadSignal( int id, int data )
 			fprintf( stderr, "!!! exception in OperThreadWin::ThreadSignal !!!\n" );
 		}
 
-		lock.Lock();
+		lock.lock();
 		cbExecuted = false;
-		p->cbCond.Signal();
+		p->cbCond.notify_all();
 	}
 	else
 	{
@@ -215,13 +216,13 @@ void OperThreadWin::OperThreadStopped() {}
 
 void OperThreadWin::ThreadStopped( int id, void* data )
 {
-	MutexLock lock( &operMutex );
+	std::unique_lock<std::mutex> lock( operMutex );
 
 //printf("stopped TN=%i\n", id);
 	if ( threadId == id )
 	{
 		threadId = -1;
-		lock.Unlock(); //!!!!!!!
+		lock.unlock(); //!!!!!!!
 		OperThreadStopped();
 	}
 }

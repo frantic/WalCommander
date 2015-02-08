@@ -130,7 +130,7 @@ bool TerminalWin::SetFirst( int n )
 
 void TerminalWin::Reread()
 {
-	MutexLock lock( _terminal.InputMutex() );
+	std::lock_guard<std::mutex> lock( _terminal.InputMutex() );
 	_terminal.SetSize( screen.rows, screen.cols );
 
 	for ( int r = 0; r < screen.rows; r++ )
@@ -306,7 +306,7 @@ bool TerminalWin::GetMarked( ClipboardText& ct )
 
 	if ( screen.marker.Empty() ) { return false; }
 
-	MutexLock lock( _terminal.InputMutex() );
+	std::lock_guard<std::mutex> lock( _terminal.InputMutex() );
 	int n1 = screen.marker.a.row;
 	int n2 = screen.marker.b.row;
 
@@ -366,7 +366,7 @@ void TerminalWin::ThreadSignal( int id, int data )
 {
 //	printf("terminal thread signal id=%i, data=%i\n", id, data);
 
-	MutexLock lock( _terminal.InputMutex() );
+	std::lock_guard<std::mutex> lock( _terminal.InputMutex() );
 
 
 	bool calcScroll = false;
@@ -429,9 +429,9 @@ void TerminalWin::ThreadSignal( int id, int data )
 
 					if ( !fullDraw )
 					{
-						lock.Unlock();
+						lock.unlock();
 						DrawRow( gc, i, first, last );
-						lock.Lock();
+						lock.lock();
 					}
 				}
 			}
@@ -448,7 +448,7 @@ void TerminalWin::ThreadSignal( int id, int data )
 	if ( screen.cursor.row >= 0 && screen.cursor.row < screen.rows )
 	{
 		EmulatorScreenPoint cur( _terminal.CRow(), _terminal.CCol() );
-		lock.Unlock();
+		lock.unlock();
 
 		if ( screen.cursor != cur ) //hide old
 		{

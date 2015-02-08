@@ -17,7 +17,7 @@ public:
 	clPtr<FSList> dirList;
 
 	/////////////////////////
-	Mutex resMutex; // {
+	std::mutex resMutex; // {
 	int badDirs;
 	int64_t fileCount;
 	int64_t folderCount;
@@ -56,12 +56,12 @@ int64_t OperDirCalcThread::CalcDir( FS* fs, FSPath path )
 
 	{
 		//lock
-		MutexLock lock( Node().GetMutex() );
+		std::lock_guard<std::mutex> lock( Node().GetMutex() );
 
 		if ( !Node().Data() ) { return -1; }
 
 		OperDirCalcData* data = ( OperDirCalcData* )Node().Data();
-		MutexLock l1( &data->resMutex );
+		std::lock_guard<std::mutex> l1( data->resMutex );
 		data->currentPath = path;
 	}
 
@@ -72,11 +72,11 @@ int64_t OperDirCalcThread::CalcDir( FS* fs, FSPath path )
 
 	if ( fs->ReadDir( &list, path, &err, Info() ) )
 	{
-		MutexLock lock( Node().GetMutex() );
+		std::lock_guard<std::mutex> lock( Node().GetMutex() );
 
 		if ( !Node().Data() ) { return -1; }
 
-		MutexLock l1( &( ( OperDirCalcData* )Node().Data() )->resMutex );
+		std::lock_guard<std::mutex> l1( ( ( OperDirCalcData* )Node().Data() )->resMutex );
 		( ( OperDirCalcData* )Node().Data() )->badDirs++;
 		return -1;
 	};
@@ -117,12 +117,12 @@ int64_t OperDirCalcThread::CalcDir( FS* fs, FSPath path )
 
 	{
 		//lock
-		MutexLock lock( Node().GetMutex() );
+		std::lock_guard<std::mutex> lock( Node().GetMutex() );
 
 		if ( !Node().Data() ) { return -1; }
 
 		OperDirCalcData* data = ( OperDirCalcData* )Node().Data();
-		MutexLock l1( &data->resMutex );
+		std::lock_guard<std::mutex> l1( data->resMutex );
 
 		data->fileCount += fileCount;
 		data->folderCount += folderCount;
@@ -150,7 +150,7 @@ int64_t OperDirCalcThread::CalcDir( FS* fs, FSPath path )
 
 void OperDirCalcThread::Calc()
 {
-	MutexLock lock( Node().GetMutex() );
+	std::unique_lock<std::mutex> lock( Node().GetMutex() );
 
 	if ( !Node().Data() ) { return; }
 
@@ -160,7 +160,7 @@ void OperDirCalcThread::Calc()
 	FSPath path =  CalcData->_path;
 	clPtr<FSList> list = CalcData->dirList;
 
-	lock.Unlock(); //!!!
+	lock.unlock(); //!!!
 
 	int cnt = path.Count();
 
@@ -412,7 +412,7 @@ void DirCalcThreadWin::RefreshCounters()
 	int64_t bad = 0;
 
 	{
-		MutexLock lock( &pData->resMutex );
+		std::lock_guard<std::mutex> lock( pData->resMutex );
 		count = pData->fileCount;
 		folderCount = pData->folderCount;
 		size  = pData->sumSize;
@@ -445,7 +445,7 @@ void DirCalcThreadWin::OperThreadSignal( int info )
 {
 	RefreshCounters();
 
-	MutexLock lock( &pData->resMutex );
+	std::lock_guard<std::mutex> lock( pData->resMutex );
 
 	if ( pData->currentPath.Count() > 0 )
 	{
@@ -502,14 +502,14 @@ void DirCalcThreadFunc( OperThreadNode* node )
 	try
 	{
 
-		MutexLock lock( node->GetMutex() );
+		std::unique_lock<std::mutex> lock( node->GetMutex() );
 
 		if ( !node->Data() ) { return; }
 
 		OperDirCalcData* data = ( ( OperDirCalcData* )node->Data() );
 		OperDirCalcThread thread( "calc dir", data->Parent(), node );
 
-		lock.Unlock();//!!!
+		lock.unlock();//!!!
 
 		try
 		{
@@ -517,7 +517,7 @@ void DirCalcThreadFunc( OperThreadNode* node )
 		}
 		catch ( cexception* ex )
 		{
-			lock.Lock(); //!!!
+			lock.lock(); //!!!
 
 			if ( !node->NBStopped() ) //обязательно надо проверить, иначе 'data' может быть неактуальной
 			{

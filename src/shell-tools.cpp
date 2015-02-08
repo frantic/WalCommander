@@ -15,7 +15,7 @@ struct ShellLoadDirTD
 	clPtr<FS> fs;
 	FSPath path;
 
-	Mutex mutex;
+	std::mutex mutex;
 	bool winClosed;
 	bool threadStopped;
 	FSCSimpleInfo info;
@@ -46,7 +46,7 @@ void* ShellLoadDirThreadFunc( void* ptr )
 	}
 	catch ( cexception* ex )
 	{
-		MutexLock lock( &data->mutex );
+		std::lock_guard<std::mutex> lock( data->mutex );
 
 		try { data->err = new_char_str( ex->message() ); }
 		catch ( cexception* x ) { x->destroy(); }
@@ -55,7 +55,7 @@ void* ShellLoadDirThreadFunc( void* ptr )
 	}
 	catch ( ... )
 	{
-		MutexLock lock( &data->mutex );
+		std::lock_guard<std::mutex> lock( data->mutex );
 
 		try { data->err = new_char_str( "BOTVA: unhabdled exception: void *VSThreadFunc(void *ptr) " ); }
 		catch ( cexception* x ) { x->destroy(); }
@@ -63,11 +63,11 @@ void* ShellLoadDirThreadFunc( void* ptr )
 
 	{
 		//lock
-		MutexLock lock( &data->mutex );
+		std::unique_lock<std::mutex> lock( data->mutex );
 
 		if ( data->winClosed )
 		{
-			lock.Unlock(); //!!!
+			lock.unlock(); //!!!
 			delete data;
 			return 0;
 		}
@@ -97,11 +97,11 @@ ShellLoadDirDialog::~ShellLoadDirDialog()
 {
 	if ( data )
 	{
-		MutexLock lock( &data->mutex );
+		std::unique_lock<std::mutex> lock( data->mutex );
 
 		if ( data->threadStopped )
 		{
-			lock.Unlock(); //!!!
+			lock.unlock(); //!!!
 			delete data;
 			data = 0;
 		}

@@ -48,7 +48,7 @@ public:
 	virtual FSString Uri( FSPath& path );
 	virtual ~FSSmb();
 
-	void GetParam( FSSmbParam* p ) { if ( !p ) { return; } MutexLock lock( &mutex ); *p = _param; }
+	void GetParam( FSSmbParam* p ) { if ( !p ) { return; } std::lock_guard<std::mutex> lock( mutex ); *p = _param; }
 };
 
 #endif

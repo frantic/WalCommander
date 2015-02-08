@@ -163,56 +163,6 @@ namespace wal
 		return 0;
 	}
 
-	int cond_create( cond_t* c )
-	{
-		c->ev[0] = c->ev[1] = 0;
-
-		if ( !( c->ev[0] = CreateEvent( NULL, TRUE, FALSE, NULL ) ) || !( c->ev[1] = CreateEvent( NULL, FALSE, FALSE, NULL ) ) )
-		{
-			DWORD e = GetLastError();
-
-			if ( c->ev[0] ) { CloseHandle( c->ev[0] ); c->ev[0] = 0; }
-
-			if ( c->ev[1] ) { CloseHandle( c->ev[1] ); c->ev[1] = 0; }
-
-			SetLastError( e );
-			return -1;
-		}
-
-		return 0;
-	}
-
-	int cond_delete( cond_t* c )
-	{
-		DWORD e0 = ( CloseHandle( c->ev[0] ) == S_OK ) ? 0 : GetLastError();
-		DWORD e1 = ( CloseHandle( c->ev[1] ) == S_OK ) ? 0 : GetLastError();
-
-		if ( e0 ) { SetLastError( e0 ); return -1; }
-
-		if ( e1 ) { SetLastError( e1 ); return -1; }
-
-		return 0;
-	}
-
-	int cond_wait( cond_t* c, mutex_t* m )
-	{
-		if ( mutex_unlock( m ) ) { return -1; }
-
-		DWORD ret = WaitForMultipleObjects( 2, c->ev, FALSE, INFINITE );
-
-		if ( mutex_lock( m ) ) { return -1; }
-
-		if ( ret == WAIT_OBJECT_0 || ret == WAIT_OBJECT_0 + 1 ) { return 0; }
-
-		return -1;
-	}
-
-	int cond_signal( cond_t* c ) { return SetEvent( c->ev[1] ) ? 0 : -1; }
-	int cond_broadcast( cond_t* c ) {    return PulseEvent( c->ev[0] ) ? 0 : -1; };
-
-
-
-
 //return count of characters (length of buffer for conversion to unicode)
 	int sys_symbol_count( const sys_char_t* s, int len )
 	{

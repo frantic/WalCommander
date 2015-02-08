@@ -17,10 +17,10 @@
 
 class FSSftp : public FS
 {
-	Mutex infoMutex;
+	std::mutex infoMutex;
 	FSSftpParam _infoParam; //должно быть то же самое что и в operParam просто мьютексв разные, и который просто mutex может блокироваться надолго (на период работы функции)
 
-	Mutex mutex;
+	std::mutex mutex;
 
 	enum CONSTS { MAX_FILES = 64 };
 
@@ -71,7 +71,7 @@ public:
 	virtual FSString Uri( FSPath& path );
 	virtual ~FSSftp();
 
-	void GetParam( FSSftpParam* p ) { if ( !p ) { return; } MutexLock lock( &infoMutex ); *p = _infoParam; }
+	void GetParam( FSSftpParam* p ) { if ( !p ) { return; } std::lock_guard<std::mutex> lock( infoMutex ); *p = _infoParam; }
 };
 
 void InitSSH();
@@ -123,7 +123,7 @@ public:
 	virtual FSString Uri( FSPath& path );
 	virtual ~FSSftp();
 
-	void GetParam( FSSftpParam* p ) { if ( !p ) { return; } MutexLock lock( &infoMutex ); *p = _infoParam; }
+	void GetParam( FSSftpParam* p ) { if ( !p ) { return; } std::lock_guard<std::mutex> lock( &infoMutex ); *p = _infoParam; }
 };
 
 void InitSSH();

@@ -202,9 +202,9 @@ public:
 
 struct ConsInput
 {
-	Mutex mutex;
+	std::mutex mutex;
 	SimpleQueue<unicode_t> queue;
-	Cond cond;
+	std::condition_variable cond;
 };
 
 static ConsInput consInput;
@@ -221,7 +221,7 @@ void* ConsInputThread( void* data )
 	{
 		{
 			//lock block
-			MutexLock lock( &consInput.mutex );
+			std::unique_lock<std::mutex> lock( consInput.mutex );
 
 			for ( i = 0; i < IBS; i++ )
 			{
@@ -242,7 +242,7 @@ void* ConsInputThread( void* data )
 
 			if ( i <= 0 )
 			{
-				consInput.cond.Wait( &consInput.mutex );
+				consInput.cond.wait( lock );
 
 				if ( consInput.queue.Empty() ) { continue; }
 			}
@@ -317,7 +317,7 @@ void W32Cons::Paste()
 
 	{
 		//lock
-		MutexLock lock( &consInput.mutex );
+		std::lock_guard<std::mutex> lock( consInput.mutex );
 		int count = text.Count();
 
 		for ( int i = 0; i < count; i++ )
@@ -330,7 +330,7 @@ void W32Cons::Paste()
 		}
 	}
 
-	consInput.cond.Signal();
+	consInput.cond.notify_all();
 }
 
 
@@ -558,7 +558,7 @@ bool W32Cons::Execute( Win* w, int tId, const unicode_t* _cmd, const unicode_t* 
 
 	{
 		//lock
-		MutexLock lock( &consInput.mutex );
+		std::lock_guard<std::mutex> lock( consInput.mutex );
 		consInput.queue.Clear();
 	}
 

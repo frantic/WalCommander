@@ -14,6 +14,7 @@
 #include "ncwin.h"
 #include "globals.h"
 
+#include <mutex>
 #include <unordered_map>
 
 SearchAndReplaceParams searchParams;
@@ -72,7 +73,7 @@ public:
 	FSPath searchPath;
 	clPtr<MegaSearcher> megaSearcher;
 
-	Mutex resMutex; // {
+	std::mutex resMutex; // {
 	int found;
 	int badDirs;
 	int badFiles;
@@ -200,12 +201,12 @@ void OperSearchThread::SearchDir( FS* fs, FSPath path, MegaSearcher* pSearcher )
 
 	{
 		//lock
-		MutexLock lock( Node().GetMutex() );
+		std::lock_guard<std::mutex> lock( Node().GetMutex() );
 
 		if ( !Node().Data() ) { return; }
 
 		OperSearchData* data = ( OperSearchData* )Node().Data();
-		MutexLock l1( &data->resMutex );
+		std::lock_guard<std::mutex> l1( data->resMutex );
 		data->currentPath = path;
 	}
 
@@ -216,11 +217,11 @@ void OperSearchThread::SearchDir( FS* fs, FSPath path, MegaSearcher* pSearcher )
 
 	if ( fs->ReadDir( &list, path, &err, Info() ) )
 	{
-		MutexLock lock( Node().GetMutex() );
+		std::lock_guard<std::mutex> lock( Node().GetMutex() );
 
 		if ( !Node().Data() ) { return; }
 
-		MutexLock l1( &( ( OperSearchData* )Node().Data() )->resMutex );
+		std::lock_guard<std::mutex> l1( ( ( OperSearchData* )Node().Data() )->resMutex );
 		( ( OperSearchData* )Node().Data() )->badDirs++;
 		return;
 	};
@@ -270,11 +271,11 @@ void OperSearchThread::SearchDir( FS* fs, FSPath path, MegaSearcher* pSearcher )
 
 				if ( ret < 0 )
 				{
-					MutexLock lock( Node().GetMutex() );
+					std::lock_guard<std::mutex> lock( Node().GetMutex() );
 
 					if ( !Node().Data() ) { return; }
 
-					MutexLock l1( &( ( OperSearchData* )Node().Data() )->resMutex );
+					std::lock_guard<std::mutex> l1( ( ( OperSearchData* )Node().Data() )->resMutex );
 					( ( OperSearchData* )Node().Data() )->badFiles++;
 				}
 
@@ -286,12 +287,12 @@ void OperSearchThread::SearchDir( FS* fs, FSPath path, MegaSearcher* pSearcher )
 
 			{
 				//lock
-				MutexLock lock( Node().GetMutex() );
+				std::lock_guard<std::mutex> lock( Node().GetMutex() );
 
 				if ( !Node().Data() ) { return; }
 
 				OperSearchData* data = ( OperSearchData* )Node().Data();
-				MutexLock l1( &data->resMutex );
+				std::lock_guard<std::mutex> l1( data->resMutex );
 
 				if ( !data->res.ptr() )
 				{
@@ -332,14 +333,14 @@ void OperSearchThread::SearchDir( FS* fs, FSPath path, MegaSearcher* pSearcher )
 
 void OperSearchThread::Search()
 {
-	MutexLock lock( Node().GetMutex() );
+	std::unique_lock<std::mutex> lock( Node().GetMutex() );
 
 	if ( !Node().Data() ) { return; }
 
 	FSPath path = ( ( OperSearchData* )Node().Data() )->searchPath;
 	clPtr<FS> fs = ( ( OperSearchData* )Node().Data() )->searchFs;
 	clPtr<MegaSearcher> pSearcher = ( ( OperSearchData* )Node().Data() )->megaSearcher;
-	lock.Unlock(); //!!!
+	lock.unlock(); //!!!
 
 	SearchDir( fs.Ptr(), path, pSearcher.ptr() );
 //printf("OperSearchThread::Search() stopped\n");
@@ -728,7 +729,7 @@ void SearchFileThreadWin::RefreshCounters()
 	int badFiles = 0;
 
 	{
-		MutexLock lock( &pData->resMutex );
+		std::lock_guard<std::mutex> lock( pData->resMutex );
 		found = pData->found;
 		badDirs = pData->badDirs;
 		badFiles = pData->badFiles;
@@ -745,7 +746,7 @@ void SearchFileThreadWin::OperThreadSignal( int info )
 {
 	RefreshCounters();
 
-	MutexLock lock( &pData->resMutex );
+	std::lock_guard<std::mutex> lock( pData->resMutex );
 
 	if ( pData->currentPath.Count() > 0 )
 	{
@@ -785,14 +786,14 @@ void SearchFileThreadFunc( OperThreadNode* node )
 {
 	try
 	{
-		MutexLock lock( node->GetMutex() );
+		std::unique_lock<std::mutex> lock( node->GetMutex() );
 
 		if ( !node->Data() ) { return; }
 
 		OperSearchData* data = ( ( OperSearchData* )node->Data() );
 		OperSearchThread thread( "find file", data->Parent(), node, data->searchParams );
 
-		lock.Unlock();//!!!
+		lock.unlock();//!!!
 
 		try
 		{
@@ -800,7 +801,7 @@ void SearchFileThreadFunc( OperThreadNode* node )
 		}
 		catch ( cexception* ex )
 		{
-			lock.Lock(); //!!!
+			lock.lock(); //!!!
 
 			if ( !node->NBStopped() ) //обязательно надо проверить, иначе 'data' может быть неактуальной
 			{

@@ -46,14 +46,14 @@ public:
 
 void OperLoadFileThread::Run()
 {
-	MutexLock lock( Node().GetMutex() ); //!!!
+	std::unique_lock<std::mutex> lock( Node().GetMutex() ); //!!!
 
 	if ( Node().NBStopped() ) { return; }
 
 	OperLoadFileData* data = ( ( OperLoadFileData* )Node().Data() );
 	clPtr<FS> fs = data->fs;
 	FSPath path = data->path;
-	lock.Unlock();
+	lock.unlock();
 
 	clPtr<MemFile> file = new MemFile;
 
@@ -64,12 +64,12 @@ void OperLoadFileThread::Run()
 	{
 		if ( fs->IsENOENT( ret_error ) )
 		{
-			lock.Lock();
+			lock.lock();
 
 			if ( Node().NBStopped() ) { return; }
 
 			data->notExist = true;
-			lock.Unlock();
+			lock.unlock();
 		}
 
 		throw_msg( "%s", fs->StrError( ret_error ).GetUtf8() );
@@ -81,11 +81,11 @@ void OperLoadFileThread::Run()
 		{
 			char buf[16 * 1024];
 
-			lock.Lock();
+			lock.lock();
 
 			if ( Node().NBStopped() ) { return; }
 
-			lock.Unlock();
+			lock.unlock();
 
 			int n = fs->Read( f, buf, sizeof( buf ), &ret_error, Info() );
 
@@ -108,7 +108,7 @@ void OperLoadFileThread::Run()
 		throw;
 	}
 
-	lock.Unlock();
+	lock.unlock();
 
 	if ( Node().NBStopped() ) { return; }
 
@@ -123,13 +123,13 @@ void LoadFileThreadFunc( OperThreadNode* node )
 {
 	try
 	{
-		MutexLock lock( node->GetMutex() );
+		std::unique_lock<std::mutex> lock( node->GetMutex() );
 
 		if ( !node->Data() ) { return; }
 
 		OperLoadFileData* data = ( ( OperLoadFileData* )node->Data() );
 		OperLoadFileThread thread( "Load editor file", data->Parent(), node );
-		lock.Unlock();//!!!
+		lock.unlock();//!!!
 
 		try
 		{
@@ -137,7 +137,7 @@ void LoadFileThreadFunc( OperThreadNode* node )
 		}
 		catch ( cexception* ex )
 		{
-			lock.Lock(); //!!!
+			lock.lock(); //!!!
 
 			if ( !node->NBStopped() ) //обязательно надо проверить, иначе 'data' может быть неактуальной
 			{
@@ -249,7 +249,7 @@ public:
 
 void OperSaveFileThread::Run()
 {
-	MutexLock lock( Node().GetMutex() ); //!!!
+	std::unique_lock<std::mutex> lock( Node().GetMutex() ); //!!!
 
 	if ( Node().NBStopped() ) { return; }
 
@@ -257,7 +257,7 @@ void OperSaveFileThread::Run()
 	clPtr<FS> fs = data->fs;
 	FSPath path = data->path;
 	clPtr<MemFile> file = data->file;
-	lock.Unlock();
+	lock.unlock();
 
 	file->BeginRead();
 
@@ -284,11 +284,11 @@ void OperSaveFileThread::Run()
 				count = sizeof( buf );
 			}
 
-			lock.Lock();
+			lock.lock();
 
 			if ( Node().NBStopped() ) { return; }
 
-			lock.Unlock();
+			lock.unlock();
 
 			int r = file->Read( buf, count );
 
@@ -318,7 +318,7 @@ void OperSaveFileThread::Run()
 		throw;
 	}
 
-	lock.Unlock();
+	lock.unlock();
 
 	if ( Node().NBStopped() ) { return; }
 
@@ -332,13 +332,13 @@ void SaveFileThreadFunc( OperThreadNode* node )
 {
 	try
 	{
-		MutexLock lock( node->GetMutex() );
+		std::unique_lock<std::mutex> lock( node->GetMutex() );
 
 		if ( !node->Data() ) { return; }
 
 		OperSaveFileData* data = ( ( OperSaveFileData* )node->Data() );
 		OperSaveFileThread thread( "Load editor file", data->Parent(), node );
-		lock.Unlock();//!!!
+		lock.unlock();//!!!
 
 		try
 		{
@@ -346,7 +346,7 @@ void SaveFileThreadFunc( OperThreadNode* node )
 		}
 		catch ( cexception* ex )
 		{
-			lock.Lock(); //!!!
+			lock.lock(); //!!!
 
 			if ( !node->NBStopped() ) //обязательно надо проверить, иначе 'data' может быть неактуальной
 			{

@@ -55,13 +55,13 @@ public:
 
 struct VFCNode
 {
-	static Mutex mutex;
+	static std::mutex mutex;
 	int useCount;
 	unsigned char data[CACHE_BLOCK_SIZE];
 	VFCNode(): useCount( 0 ) {}
 };
 
-wal::Mutex VFCNode::mutex;
+std::mutex VFCNode::mutex;
 
 class VDataPtr
 {
@@ -70,12 +70,12 @@ class VDataPtr
 	{
 		if ( ptr )
 		{
-			MutexLock lock( &VFCNode::mutex );
+			std::unique_lock<std::mutex> lock( VFCNode::mutex );
 			ptr->useCount--;
 
 			if ( ptr->useCount <= 0 )
 			{
-				lock.Unlock(); //!!!
+				lock.unlock(); //!!!
 				delete ptr;
 			}
 
@@ -85,8 +85,8 @@ class VDataPtr
 public:
 	VDataPtr(): ptr( 0 ) {}
 	VDataPtr( VFCNode* p ): ptr( p ) { if ( p ) { ptr->useCount++; } }
-	VDataPtr( const VDataPtr& a ): ptr( a.ptr ) { if ( ptr ) { MutexLock lock( &VFCNode::mutex ); ptr->useCount++; } }
-	VDataPtr& operator = ( const VDataPtr& a ) { Clear(); ptr = a.ptr; if ( ptr ) { MutexLock lock( &VFCNode::mutex ); ptr->useCount++; } return *this; }
+	VDataPtr( const VDataPtr& a ): ptr( a.ptr ) { if ( ptr ) { std::lock_guard<std::mutex> lock( VFCNode::mutex ); ptr->useCount++; } }
+	VDataPtr& operator = ( const VDataPtr& a ) { Clear(); ptr = a.ptr; if ( ptr ) { std::lock_guard<std::mutex> lock( VFCNode::mutex ); ptr->useCount++; } return *this; }
 	const unsigned char* Data() { return ptr ? ptr->data : 0; }
 	~VDataPtr() { Clear(); }
 };
@@ -133,7 +133,7 @@ class VFilePtr;
 class VFile
 {
 	friend class VFilePtr;
-	Mutex mutex;
+	std::mutex mutex;
 	int useCount;
 
 	clPtr<FS> fs;
@@ -411,7 +411,8 @@ void VFile::CheckOpen( FSCInfo* info )
 
 VDataPtr VFile::_Get( long bn, FSCInfo* info, bool lockMutex )
 {
-	MutexLock lock( &mutex, lockMutex );
+	std::unique_lock<std::mutex> lock( mutex, std::defer_lock );
+	if ( lockMutex ) lock.lock();
 
 	VDataPtr ptr = CacheGet( bn );
 
@@ -760,12 +761,12 @@ class VFilePtr
 	{
 		if ( ptr )
 		{
-			MutexLock lock( &ptr->mutex );
+			std::unique_lock<std::mutex> lock( ptr->mutex );
 			ptr->useCount--;
 
 			if ( ptr->useCount <= 0 )
 			{
-				lock.Unlock(); //!!!
+				lock.unlock(); //!!!
 				delete ptr;
 			}
 
@@ -786,7 +787,7 @@ public:
 	{
 		if ( ptr )
 		{
-			MutexLock lock( &ptr->mutex );
+			std::lock_guard<std::mutex> lock( ptr->mutex );
 			ptr->useCount++;
 		}
 	}
@@ -798,7 +799,7 @@ public:
 
 		if ( ptr )
 		{
-			MutexLock lock( &ptr->mutex );
+			std::lock_guard<std::mutex> lock( ptr->mutex );
 			ptr->useCount++;
 		}
 
@@ -815,18 +816,18 @@ public:
 class FSCViewerInfo: public FSCInfo
 {
 public:
-	Mutex mutex;
+	std::mutex mutex;
 	bool stopped;
 	FSCViewerInfo(): stopped( false ) {}
-	void Reset() { MutexLock lock( &mutex ); stopped = false; }
-	void SetStop() { MutexLock lock( &mutex ); stopped = true; }
+	void Reset() { std::lock_guard<std::mutex> lock( mutex ); stopped = false; }
+	void SetStop() { std::lock_guard<std::mutex> lock( mutex ); stopped = true; }
 	virtual bool Stopped();
 	virtual ~FSCViewerInfo();
 };
 
 bool FSCViewerInfo::Stopped()
 {
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 	return stopped;
 }
 
@@ -872,8 +873,8 @@ public:
 
 	FSCViewerInfo info;
 
-	Mutex mutex;
-	Cond cond;
+	std::mutex mutex;
+	std::condition_variable cond;
 
 	int inFlags;
 	ViewerEvent inEvent;
@@ -905,10 +906,10 @@ int ViewerThreadData::NewTid()
 
 void ViewerThreadData::SetEvent( const ViewerEvent& e )
 {
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 	inEvent = e;
 	inFlags |= FEVENT;
-	cond.Signal();
+	cond.notify_all();
 }
 
 inline int VStrWrapCount( int lineCols, int cols )
@@ -951,11 +952,11 @@ void* ViewerThread( void* param )
 
 			{
 				//lock
-				MutexLock lock( &tData->mutex );
+				std::unique_lock<std::mutex> lock( tData->mutex );
 
 				if ( !tData->inFlags )
 				{
-					tData->cond.Wait( &tData->mutex );
+					tData->cond.wait( lock );
 				}
 
 				flags = tData->inFlags;
@@ -989,7 +990,7 @@ void* ViewerThread( void* param )
 			}
 			else
 			{
-				MutexLock lock( &tData->mutex );
+				std::lock_guard<std::mutex> lock( tData->mutex );
 				tData->loadStartTime = time( 0 );
 
 				file->CheckStat( &tData->info );
@@ -1673,7 +1674,7 @@ void* ViewerThread( void* param )
 
 			{
 				//lock
-				MutexLock lock( &tData->mutex );
+				std::lock_guard<std::mutex> lock( tData->mutex );
 				tData->ret = ret;
 				tData->pos = pos;
 				WinThreadSignal( 0 );
@@ -1700,7 +1701,7 @@ void* ViewerThread( void* param )
 		}
 
 		{
-			MutexLock lock( &tData->mutex );
+			std::lock_guard<std::mutex> lock( tData->mutex );
 			tData->loadStartTime = 0;
 		}
 	}
@@ -1767,9 +1768,9 @@ void ViewWin::EventTimer( int tid )
 {
 	if ( threadData && tid == 1 )
 	{
-		MutexLock lock( &threadData->mutex );
+		std::lock_guard<std::mutex> lock( threadData->mutex );
 		threadData->inFlags |= ViewerThreadData::FTIMER;
-		threadData->cond.Signal();
+		threadData->cond.notify_all();
 
 		int64_t tim = time( 0 );
 
@@ -1785,12 +1786,12 @@ void ViewWin::WrapUnwrap()
 {
 	if ( threadData )
 	{
-		MutexLock lock( &threadData->mutex );
+		std::lock_guard<std::mutex> lock( threadData->mutex );
 		wrap = !wrap;
 		threadData->inMode.wrap = wrap;
 		threadData->inFlags |= ViewerThreadData::FMODE;
 		threadData->inFlags &= ~ViewerThreadData::FEVENT; //clear key events
-		threadData->cond.Signal();
+		threadData->cond.notify_all();
 	}
 }
 
@@ -1798,12 +1799,12 @@ void ViewWin::HexText()
 {
 	if ( threadData )
 	{
-		MutexLock lock( &threadData->mutex );
+		std::lock_guard<std::mutex> lock( threadData->mutex );
 		hex = !hex;
 		threadData->inMode.hex = hex;
 		threadData->inFlags |= ViewerThreadData::FMODE;
 		threadData->inFlags &= ~ViewerThreadData::FEVENT; //clear key events
-		threadData->cond.Signal();
+		threadData->cond.notify_all();
 	}
 
 	CalcSize();
@@ -1827,11 +1828,11 @@ void ViewWin::SetCharset( charset_struct* cs )
 
 	if ( threadData )
 	{
-		MutexLock lock( &threadData->mutex );
+		std::lock_guard<std::mutex> lock( threadData->mutex );
 		threadData->inMode.charset = cs;
 		threadData->inFlags |= ViewerThreadData::FMODE;
 		threadData->inFlags &= ~ViewerThreadData::FEVENT; //clear key events
-		threadData->cond.Signal();
+		threadData->cond.notify_all();
 	}
 }
 
@@ -1840,7 +1841,7 @@ bool ViewWin::CalcSize()
 {
 	if ( threadData )
 	{
-		MutexLock lock( &threadData->mutex );
+		std::lock_guard<std::mutex> lock( threadData->mutex );
 		int r = 0, c = 0;
 
 		if ( threadData->inMode.hex )
@@ -1869,7 +1870,7 @@ bool ViewWin::CalcSize()
 			threadData->inSize.cols = c;
 			threadData->inFlags |= ViewerThreadData::FSIZE;
 			threadData->inFlags &= ~ViewerThreadData::FEVENT; //clear key events
-			threadData->cond.Signal();
+			threadData->cond.notify_all();
 			return true;
 		}
 	}
@@ -1881,14 +1882,14 @@ void ViewWin::ThreadSignal( int id, int data )
 {
 	if ( threadData && threadData->Id() == id )
 	{
-		MutexLock lock( &threadData->mutex );
+		std::unique_lock<std::mutex> lock( threadData->mutex );
 		drawLoading = false;
 
 		if ( threadData->error.data() )
 		{
 			std::vector<char> s = threadData->error;
 
-			lock.Unlock(); //!!!
+			lock.unlock(); //!!!
 			ClearFile();
 			Parent()->Command( ID_QUIT, 0, this, 0 );
 			NCMessageBox( ( NCDialogParent* )Parent(), "Viewer", s.data(),  true );
@@ -2374,7 +2375,7 @@ void ViewWin::CalcScroll()
 {
 	if ( threadData )
 	{
-		MutexLock lock( &threadData->mutex );
+		std::unique_lock<std::mutex> lock( threadData->mutex );
 		ScrollInfo hsi;
 		hsi.m_PageSize = threadData->ret.size.cols;
 
@@ -2401,7 +2402,7 @@ void ViewWin::CalcScroll()
 
 		if ( hVisible != hscroll.IsVisible() || vVisible != vscroll.IsVisible() )
 		{
-			lock.Unlock(); //!!!
+			lock.unlock(); //!!!
 			this->RecalcLayouts();
 			CalcSize();
 		}
@@ -2492,10 +2493,10 @@ void ViewWin::ClearFile()
 	if ( threadData )
 	{
 		lastResult.Clear();
-		MutexLock lock( &threadData->mutex );
+		std::lock_guard<std::mutex> lock( threadData->mutex );
 		threadData->inFlags |= ViewerThreadData::FSTOP;
 		threadData->info.SetStop();
-		threadData->cond.Signal(); //!!!
+		threadData->cond.notify_all(); //!!!
 		threadData = 0;
 	};
 }
@@ -2546,7 +2547,7 @@ ViewWin::~ViewWin()
 
 struct VSTData
 {
-	Mutex mutex;
+	std::mutex mutex;
 	//in
 	VFilePtr file;
 	std::vector<unicode_t> str;
@@ -2579,7 +2580,7 @@ void* VSThreadFunc( void* ptr )
 
 	{
 		//lock
-		MutexLock lock( &data->mutex );
+		std::lock_guard<std::mutex> lock( data->mutex );
 	}
 
 	try
@@ -2693,11 +2694,11 @@ void* VSThreadFunc( void* ptr )
 
 	{
 		//lock
-		MutexLock lock( &data->mutex );
+		std::unique_lock<std::mutex> lock( data->mutex );
 
 		if ( data->winClosed )
 		{
-			lock.Unlock(); //!!!
+			lock.unlock(); //!!!
 			delete data;
 			return 0;
 		}
@@ -2740,11 +2741,11 @@ VSearchDialog::~VSearchDialog()
 {
 	if ( data )
 	{
-		MutexLock lock( &data->mutex );
+		std::unique_lock<std::mutex> lock( data->mutex );
 
 		if ( data->threadStopped )
 		{
-			lock.Unlock(); //!!!
+			lock.unlock(); //!!!
 			delete data;
 			data = 0;
 		}
@@ -2771,7 +2772,7 @@ bool ViewWin::Search( const unicode_t* str, bool sensitive )
 
 	{
 		//lock
-		MutexLock lock( &threadData->mutex );
+		std::lock_guard<std::mutex> lock( threadData->mutex );
 
 		if ( threadData->pos.begin >= 0 ) { offset = threadData->pos.begin; }
 

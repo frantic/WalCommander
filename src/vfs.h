@@ -482,11 +482,11 @@ public:
 class FSCSimpleInfo: public FSCInfo
 {
 public:
-	Mutex mutex;
+	std::mutex mutex;
 	bool stopped;
 	FSCSimpleInfo(): stopped( false ) {}
-	void Reset() { MutexLock lock( &mutex ); stopped = false; }
-	void SetStop() { MutexLock lock( &mutex ); stopped = true; }
+	void Reset() { std::lock_guard<std::mutex> lock( mutex ); stopped = false; }
+	void SetStop() { std::lock_guard<std::mutex> lock( mutex ); stopped = true; }
 	virtual bool Stopped();
 	virtual ~FSCSimpleInfo();
 };
@@ -552,7 +552,7 @@ public:
 #ifdef _WIN32
 class FSSysHandles
 {
-	Mutex mutex;
+	std::mutex mutex;
 	enum { SIZE = 32 };
 	struct Node
 	{
@@ -564,7 +564,7 @@ public:
 	FSSysHandles() { for ( int i = 0; i < SIZE; i++ ) { table[i].busy = false; } }
 	int New()
 	{
-		MutexLock lock( &mutex );
+		std::lock_guard<std::mutex> lock( mutex );
 
 		for ( int i = 0; i < SIZE; i++ )
 			if ( !table[i].busy ) { table[i].handle = INVALID_HANDLE_VALUE; table[i].busy = true; return i; }
@@ -573,7 +573,7 @@ public:
 	};
 	HANDLE* Handle( int n )
 	{
-		MutexLock lock( &mutex );
+		std::lock_guard<std::mutex> lock( mutex );
 
 		if ( n >= 0 && n < SIZE && table[n].busy )
 		{
@@ -584,7 +584,7 @@ public:
 	}
 	void Free( int n )
 	{
-		MutexLock lock( &mutex );
+		std::lock_guard<std::mutex> lock( mutex );
 
 		if ( n >= 0 && n < SIZE && table[n].busy )
 		{

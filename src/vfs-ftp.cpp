@@ -321,13 +321,13 @@ FTPNode::~FTPNode() {}
 
 int FSFtp::GetFreeNode( int* err, FSCInfo* info )
 {
-	MutexLock lock( &mutex );
+	std::unique_lock<std::mutex> lock( mutex );
 
 	if ( !_param.isSet && info )
 	{
 		if ( info->FtpLogon( &_param ) && _param.isSet )
 		{
-			MutexLock l1( &infoMutex );
+			std::lock_guard<std::mutex> l1( infoMutex );
 			_infoParam = _param;
 		}
 		else
@@ -356,7 +356,7 @@ int FSFtp::GetFreeNode( int* err, FSCInfo* info )
 
 	p->busy = true;
 
-	lock.Unlock();
+	lock.unlock();
 
 	if ( p->pFtpNode.ptr() ) //check
 	{
@@ -398,7 +398,7 @@ int FSFtp::GetFreeNode( int* err, FSCInfo* info )
 		}
 		catch ( int e )
 		{
-			lock.Lock(); //!!!
+			lock.lock(); //!!!
 
 			p->pFtpNode = 0;
 			p->busy = false;
@@ -435,8 +435,8 @@ bool FSFtp::Equal( FS* fs )
 
 	FSFtp* f = ( FSFtp* )fs;
 
-	MutexLock l1( &infoMutex );
-	MutexLock l2( &( f->infoMutex ) );
+	std::lock_guard<std::mutex> l1( infoMutex );
+	std::lock_guard<std::mutex> l2( ( f->infoMutex ) );
 
 	if ( _infoParam.isSet != f->_infoParam.isSet )
 	{
@@ -598,7 +598,7 @@ int FSFtp::OpenRead  ( FSPath& path, int flags, int* err, FSCInfo* info )
 	}
 	catch ( int e )
 	{
-		MutexLock lock( &mutex );
+		std::lock_guard<std::mutex> lock( mutex );
 		p->busy = false;
 
 		if ( err ) { *err = e; }
@@ -640,7 +640,7 @@ int FSFtp::OpenCreate   ( FSPath& path, bool overwrite, int mode, int flags, int
 	}
 	catch ( int e )
 	{
-		MutexLock lock( &mutex );
+		std::lock_guard<std::mutex> lock( mutex );
 		p->busy = false;
 
 		if ( err ) { *err = e; }
@@ -663,7 +663,7 @@ int FSFtp::Close  ( int fd, int* err, FSCInfo* info )
 	Node* p = nodes + fd;
 
 	{
-		MutexLock lock( &mutex );
+		std::unique_lock<std::mutex> lock( mutex );
 
 		if ( !p->busy )
 		{
@@ -672,7 +672,7 @@ int FSFtp::Close  ( int fd, int* err, FSCInfo* info )
 			return -1;
 		}
 
-		lock.Unlock();
+		lock.unlock();
 	}
 
 	try
@@ -682,14 +682,14 @@ int FSFtp::Close  ( int fd, int* err, FSCInfo* info )
 		p->pFtpNode->CloseData();
 
 		{
-			MutexLock lock( &mutex );
+			std::lock_guard<std::mutex> lock( mutex );
 			p->busy = false;
 		}
 
 	}
 	catch ( int e )
 	{
-		MutexLock lock( &mutex );
+		std::lock_guard<std::mutex> lock( mutex );
 		p->busy = false;
 
 		if ( err ) { *err = e; }
@@ -713,7 +713,7 @@ int FSFtp::Read   ( int fd, void* buf, int size, int* err, FSCInfo* info )
 	Node* p = nodes + fd;
 
 	{
-		MutexLock lock( &mutex );
+		std::unique_lock<std::mutex> lock( mutex );
 
 		if ( !p->busy )
 		{
@@ -722,7 +722,7 @@ int FSFtp::Read   ( int fd, void* buf, int size, int* err, FSCInfo* info )
 			return -1;
 		}
 
-		lock.Unlock();
+		lock.unlock();
 	}
 
 	try
@@ -761,7 +761,7 @@ int FSFtp::Write  ( int fd, void* buf, int size, int* err, FSCInfo* info )
 	Node* p = nodes + fd;
 
 	{
-		MutexLock lock( &mutex );
+		std::unique_lock<std::mutex> lock( mutex );
 
 		if ( !p->busy )
 		{
@@ -770,7 +770,7 @@ int FSFtp::Write  ( int fd, void* buf, int size, int* err, FSCInfo* info )
 			return -1;
 		}
 
-		lock.Unlock();
+		lock.unlock();
 	}
 
 	try
@@ -816,7 +816,7 @@ int FSFtp::Rename ( FSPath&  oldpath, FSPath& newpath, int* err,  FSCInfo* info 
 	}
 	catch ( int e )
 	{
-		MutexLock lock( &mutex );
+		std::lock_guard<std::mutex> lock( mutex );
 		p->busy = false;
 
 		if ( err ) { *err = e; }
@@ -824,7 +824,7 @@ int FSFtp::Rename ( FSPath&  oldpath, FSPath& newpath, int* err,  FSCInfo* info 
 		return ( e == -2 ) ? -2 : -1;
 	}
 
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 	p->busy = false;
 
 	return 0;
@@ -862,7 +862,7 @@ int FSFtp::MkDir  ( FSPath& path, int mode, int* err,  FSCInfo* info )
 	}
 	catch ( int e )
 	{
-		MutexLock lock( &mutex );
+		std::lock_guard<std::mutex> lock( mutex );
 		p->busy = false;
 
 		if ( err ) { *err = e; }
@@ -870,7 +870,7 @@ int FSFtp::MkDir  ( FSPath& path, int mode, int* err,  FSCInfo* info )
 		return ( e == -2 ) ? -2 : -1;
 	}
 
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 	p->busy = false;
 
 	return 0;
@@ -893,7 +893,7 @@ int FSFtp::Delete( FSPath& path, int* err, FSCInfo* info )
 	}
 	catch ( int e )
 	{
-		MutexLock lock( &mutex );
+		std::lock_guard<std::mutex> lock( mutex );
 		p->busy = false;
 
 		if ( err ) { *err = e; }
@@ -901,7 +901,7 @@ int FSFtp::Delete( FSPath& path, int* err, FSCInfo* info )
 		return ( e == -2 ) ? -2 : -1;
 	}
 
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 	p->busy = false;
 
 
@@ -927,7 +927,7 @@ int FSFtp::RmDir  ( FSPath& path, int* err, FSCInfo* info )
 	}
 	catch ( int e )
 	{
-		MutexLock lock( &mutex );
+		std::lock_guard<std::mutex> lock( mutex );
 		p->busy = false;
 
 		if ( err ) { *err = e; }
@@ -935,7 +935,7 @@ int FSFtp::RmDir  ( FSPath& path, int* err, FSCInfo* info )
 		return ( e == -2 ) ? -2 : -1;
 	}
 
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 	p->busy = false;
 
 	return 0;
@@ -1416,7 +1416,7 @@ int FSFtp::ReadDir_int ( FSList* list, cstrhash<FSStat, char>* pSHash, FSPath& _
 	}
 	catch ( int e )
 	{
-		MutexLock lock( &mutex );
+		std::lock_guard<std::mutex> lock( mutex );
 		p->busy = false;
 
 		if ( err ) { *err = e; }
@@ -1424,7 +1424,7 @@ int FSFtp::ReadDir_int ( FSList* list, cstrhash<FSStat, char>* pSHash, FSPath& _
 		return ( e == -2 ) ? -2 : -1;
 	}
 
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 	p->busy = false;
 
 	return 0;
@@ -1498,7 +1498,7 @@ int FSFtp::Seek(int fd, SEEK_FILE_MODE mode, seek_t pos, seek_t *pRet,  int *err
 
 FSString FSFtp::Uri( FSPath& path )
 {
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 
 	std::vector<char> a;
 
@@ -1598,7 +1598,7 @@ FtpStatCache::Dir* FtpStatCache::GetParent( FSPath& path )
 
 int FtpStatCache::GetStat( FSPath path, FSStat* st )
 {
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 
 	Dir* d = GetParent( path );
 
@@ -1623,7 +1623,7 @@ int FtpStatCache::GetStat( FSPath path, FSStat* st )
 
 void FtpStatCache::Del( FSPath path )
 {
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 
 	Dir* d = GetParent( path );
 
@@ -1638,7 +1638,7 @@ void FtpStatCache::Del( FSPath path )
 
 void FtpStatCache::PutStat( FSPath path, clPtr<cstrhash<FSStat, char> > statHash )
 {
-	MutexLock lock( &mutex );
+	std::lock_guard<std::mutex> lock( mutex );
 
 	int n = 0;
 	Dir* d = &root;

@@ -68,7 +68,7 @@ int SmbLogonOperCallback( void* cbData )
 bool OF_FSCInfo::SmbLogon( FSSmbParam* a )
 {
 #ifdef LIBSMBCLIENT_EXIST
-	MutexLock lock( _node->GetMutex() );
+	std::lock_guard<std::mutex> lock( _node->GetMutex() );
 
 	if ( _node->NBStopped() ) { return false; }
 
@@ -79,7 +79,7 @@ bool OF_FSCInfo::SmbLogon( FSSmbParam* a )
 	SmbLogonCBData data;
 	data.param = a;
 	data.parent = p->Parent();
-	lock.Unlock();
+	lock.unlock();
 	return _node->CallBack( SmbLogonOperCallback, &data ) > 0;
 #else
 	return false;
@@ -105,7 +105,7 @@ int FtpLogonOperCallback( void* cbData )
 bool OF_FSCInfo::FtpLogon( FSFtpParam* a )
 {
 
-	MutexLock lock( _node->GetMutex() );
+	std::unique_lock<std::mutex> lock( _node->GetMutex() );
 
 	if ( _node->NBStopped() ) { return false; }
 
@@ -116,7 +116,7 @@ bool OF_FSCInfo::FtpLogon( FSFtpParam* a )
 	FtpLogonCBData data;
 	data.param = a;
 	data.parent = p->Parent();
-	lock.Unlock();
+	lock.unlock();
 	return _node->CallBack( FtpLogonOperCallback, &data ) > 0;
 }
 
@@ -133,7 +133,7 @@ int PromptOperCallback( void* cbData )
 
 bool OF_FSCInfo::Prompt( const unicode_t* header, const unicode_t* message, FSPromptData* prompts, int count )
 {
-	MutexLock lock( _node->GetMutex() );
+	std::unique_lock<std::mutex> lock( _node->GetMutex() );
 
 	if ( _node->NBStopped() ) { return false; }
 
@@ -147,14 +147,14 @@ bool OF_FSCInfo::Prompt( const unicode_t* header, const unicode_t* message, FSPr
 	data.prompts = prompts;
 	data.count = count;
 	data.parent = p->Parent();
-	lock.Unlock();
+	lock.unlock();
 	return _node->CallBack( PromptOperCallback, &data ) > 0;
 }
 
 
 bool OF_FSCInfo::Stopped()
 {
-	MutexLock lock( _node->GetMutex() );
+	std::lock_guard<std::mutex> lock( _node->GetMutex() );
 	return _node->NBStopped();
 };
 
@@ -256,7 +256,7 @@ void OperRDThread::Run()
 	FSStatVfs vst;
 	fs->StatVfs( path, &vst, &ret_err, Info() );
 
-	MutexLock lock( Node().GetMutex() ); //!!!
+	std::lock_guard<std::mutex> lock( Node().GetMutex() ); //!!!
 
 	if ( Node().NBStopped() ) { return; }
 
@@ -278,14 +278,14 @@ void ReadDirThreadFunc( OperThreadNode* node )
 {
 	try
 	{
-		MutexLock lock( node->GetMutex() );
+		std::unique_lock<std::mutex> lock( node->GetMutex() );
 
 		if ( !node->Data() ) { return; }
 
 		OperRDData* data = ( ( OperRDData* )node->Data() );
 		//dbg_printf("ReadDirThreadFunc path=%s",data->path.GetUtf8());
 		OperRDThread thread( "panel::chdir", data->Parent(), node, data->fs, data->path );
-		lock.Unlock();//!!!
+		lock.unlock();//!!!
 
 		try
 		{
@@ -293,7 +293,7 @@ void ReadDirThreadFunc( OperThreadNode* node )
 		}
 		catch ( cexception* ex )
 		{
-			lock.Lock(); //!!!
+			lock.lock(); //!!!
 
 			if ( !node->NBStopped() ) //обязательно надо проверить, иначе 'data' может быть неактуальной
 			{
@@ -338,7 +338,7 @@ public:
 	FSString errorString; //??volatile
 	clPtr<cstrhash<bool, unicode_t> > resList; //??volatile
 
-	Mutex infoMutex;
+	std::mutex infoMutex;
 	volatile bool pathChanged;
 	volatile uint64_t infoCount;
 
@@ -466,7 +466,7 @@ void MkDirThreadFunc( OperThreadNode* node )
 {
 	try
 	{
-		MutexLock lock( node->GetMutex() );
+		std::unique_lock<std::mutex> lock( node->GetMutex() );
 
 		if ( !node->Data() ) { return; }
 
@@ -476,7 +476,7 @@ void MkDirThreadFunc( OperThreadNode* node )
 		clPtr<FS> fs = data->srcFs;
 		FSPath path = data->srcPath;
 
-		lock.Unlock();//!!!
+		lock.unlock();//!!!
 
 		try
 		{
@@ -484,7 +484,7 @@ void MkDirThreadFunc( OperThreadNode* node )
 		}
 		catch ( cexception* ex )
 		{
-			lock.Lock(); //!!!
+			lock.lock(); //!!!
 
 			if ( !node->NBStopped() ) //обязательно надо проверить, иначе 'data' может быть неактуальной
 			{
@@ -670,7 +670,7 @@ void DeleteThreadFunc( OperThreadNode* node )
 {
 	try
 	{
-		MutexLock lock( node->GetMutex() );
+		std::unique_lock<std::mutex> lock( node->GetMutex() );
 
 		if ( !node->Data() ) { return; }
 
@@ -681,7 +681,7 @@ void DeleteThreadFunc( OperThreadNode* node )
 		FSPath path = data->srcPath;
 		clPtr<FSList> list = data->srcList;
 
-		lock.Unlock();//!!!
+		lock.unlock();//!!!
 
 		try
 		{
@@ -692,7 +692,7 @@ void DeleteThreadFunc( OperThreadNode* node )
 		}
 		catch ( cexception* ex )
 		{
-			lock.Lock(); //!!!
+			lock.lock(); //!!!
 
 			if ( !node->NBStopped() ) //обязательно надо проверить, иначе 'data' может быть неактуальной
 			{
@@ -732,7 +732,7 @@ bool DeleteList( clPtr<FS> f, FSPath& p, clPtr<FSList> list, NCDialogParent* par
 
 bool OperCFThread::SendCopyNextFileInfo( FSString from, FSString to )
 {
-	MutexLock lock( Node().GetMutex() );
+	std::lock_guard<std::mutex> lock( Node().GetMutex() );
 
 	if ( Node().NBStopped() ) { return false; }
 
@@ -759,7 +759,7 @@ namespace wal
 
 bool OperCFThread::SendProgressInfo( int64_t size, int64_t progress, int64_t bytes )
 {
-	MutexLock lock( Node().GetMutex() );
+	std::lock_guard<std::mutex> lock( Node().GetMutex() );
 
 	if ( Node().NBStopped() ) { return false; }
 
@@ -1139,11 +1139,10 @@ void CopyDialog::EventTimer( int tid )
 		int64_t bytes = 0;
 
 		{
-			MutexLock lock( &threadData.infoMutex );
+			std::lock_guard<std::mutex> lock( threadData.infoMutex );
 			ms = threadData.infoMs;
 			bytes = threadData.infoBytes;
 			threadData.infoBytes = 0;
-			lock.Unlock();
 		}
 
 		//shift
@@ -1194,7 +1193,7 @@ void CopyDialog::OperThreadSignal( int info )
 {
 	if ( info == INFO_NEXTFILE )
 	{
-		MutexLock lock( &threadData.infoMutex );
+		std::lock_guard<std::mutex> lock( threadData.infoMutex );
 
 		if ( threadData.pathChanged )
 		{
@@ -1609,7 +1608,7 @@ void CopyThreadFunc( OperThreadNode* node )
 {
 	try
 	{
-		MutexLock lock( node->GetMutex() );
+		std::unique_lock<std::mutex> lock( node->GetMutex() );
 
 		if ( !node->Data() ) { return; }
 
@@ -1622,13 +1621,13 @@ void CopyThreadFunc( OperThreadNode* node )
 		FSPath destPath = data->destPath;
 		clPtr<FSList> list = data->srcList;
 
-		lock.Unlock();//!!!
+		lock.unlock();//!!!
 
 		try
 		{
 			clPtr<cstrhash<bool, unicode_t> > resList = new cstrhash<bool, unicode_t>;
 			thread.Copy( srcFs.Ptr(), srcPath, list.ptr(), destFs.Ptr(), destPath, *( resList.ptr() ) );
-			lock.Lock(); //!!!
+			lock.lock(); //!!!
 
 			if ( !node->NBStopped() )
 			{
@@ -1638,7 +1637,7 @@ void CopyThreadFunc( OperThreadNode* node )
 		}
 		catch ( cexception* ex )
 		{
-			lock.Lock(); //!!!
+			lock.lock(); //!!!
 
 			if ( !node->NBStopped() ) //обязательно надо проверить, иначе 'data' может быть неактуальной
 			{
@@ -1944,7 +1943,7 @@ void MoveThreadFunc( OperThreadNode* node )
 {
 	try
 	{
-		MutexLock lock( node->GetMutex() );
+		std::unique_lock<std::mutex> lock( node->GetMutex() );
 
 		if ( !node->Data() ) { return; }
 
@@ -1957,7 +1956,7 @@ void MoveThreadFunc( OperThreadNode* node )
 		FSPath destPath = data->destPath;
 		clPtr<FSList> list = data->srcList;
 
-		lock.Unlock();//!!!
+		lock.unlock();//!!!
 
 		try
 		{
@@ -1965,7 +1964,7 @@ void MoveThreadFunc( OperThreadNode* node )
 		}
 		catch ( cexception* ex )
 		{
-			lock.Lock(); //!!!
+			lock.lock(); //!!!
 
 			if ( !node->NBStopped() ) //обязательно надо проверить, иначе 'data' может быть неактуальной
 			{

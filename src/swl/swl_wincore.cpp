@@ -688,7 +688,7 @@ namespace wal
 		WTHNode* volatile cmdFirst;
 		WTHNode* volatile cmdLast;
 
-		Mutex mutex;
+		std::mutex mutex;
 	public:
 		WTHash()
 			: cmdFirst( 0 ), cmdLast( 0 )
@@ -708,7 +708,7 @@ namespace wal
 		WTHNode* p = ( ( WTHNode* )data );
 		void* ret = p->func( p->fData );
 
-		MutexLock lock( &wtHash.mutex );
+		std::lock_guard<std::mutex> lock( wtHash.mutex );
 		unsigned tN = th_key( p->th ) % WTH_HASH_SIZE;
 
 		WTHNode* volatile* t = &( wtHash.thList[tN] );
@@ -762,7 +762,7 @@ namespace wal
 		p->id = id;
 		p->func = f;
 		p->fData = d;
-		MutexLock lock( &wtHash.mutex );
+		std::lock_guard<std::mutex> lock( wtHash.mutex );
 
 		int err = thread_create( const_cast<thread_t*>( &( p->th ) ), _swl_win_thread_func, p );
 
@@ -781,7 +781,7 @@ namespace wal
 		thread_t th = thread_self();
 		unsigned n = th_key( th ) % WTH_HASH_SIZE;
 //printf("Find tn=%i (%p)\n", n, th);
-		MutexLock lock( &wtHash.mutex );
+		std::lock_guard<std::mutex> lock( wtHash.mutex );
 
 		wthInternalEvent.SetSignal();
 
@@ -816,7 +816,7 @@ namespace wal
 
 	void wth_DropWindow( Win* w )
 	{
-		MutexLock lock( &wtHash.mutex );
+		std::lock_guard<std::mutex> lock( wtHash.mutex );
 		unsigned n = win_key( w ) % WTH_HASH_SIZE;
 		WTHNode* volatile* p = &( wtHash.winList[n] );
 
@@ -839,7 +839,7 @@ namespace wal
 		WTHNode* last = 0;
 
 		{
-			MutexLock lock( &wtHash.mutex );
+			std::lock_guard<std::mutex> lock( wtHash.mutex );
 			last = wtHash.cmdLast;
 			wthInternalEvent.ClearSignal();
 		}
@@ -848,7 +848,7 @@ namespace wal
 
 		while ( true )
 		{
-			MutexLock lock( &wtHash.mutex );
+			std::unique_lock<std::mutex> lock( wtHash.mutex );
 			WTHNode* p = wtHash.cmdFirst;
 
 			if ( !p ) { break; } //botva?
@@ -871,7 +871,7 @@ namespace wal
 
 				if ( !wtHash.cmdFirst ) { wtHash.cmdLast = 0; }
 
-				lock.Unlock();
+				lock.unlock();
 
 				try
 				{
@@ -904,7 +904,7 @@ namespace wal
 
 				if ( !wtHash.cmdFirst ) { wtHash.cmdLast = 0; }
 
-				lock.Unlock();
+				lock.unlock();
 
 				if ( w )
 				{
@@ -1437,14 +1437,14 @@ namespace wal
 
 /////////////////////////// cicon //////////////////////////////////
 
-	Mutex iconCopyMutex;
-	Mutex iconListMutex;
+	std::mutex iconCopyMutex;
+	std::mutex iconListMutex;
 
 	static std::unordered_map< int, ccollect< clPtr< cicon > > > cmdIconList;
 
 	void cicon::SetCmdIcon( int cmd, const Image32& image, int w, int h )
 	{
-		MutexLock lock( &iconListMutex );
+		std::lock_guard<std::mutex> lock( iconListMutex );
 		ccollect< clPtr<cicon> >& p = cmdIconList[cmd];
 		int n = p.count();
 
@@ -1475,7 +1475,7 @@ namespace wal
 
 	void cicon::ClearCmdIcons( int cmd )
 	{
-		MutexLock lock( &iconListMutex );
+		std::lock_guard<std::mutex> lock( iconListMutex );
 		cmdIconList.erase( cmd );
 	}
 
@@ -1497,7 +1497,7 @@ namespace wal
 	{
 		if ( data ) { Clear(); }
 
-		MutexLock lock( &iconListMutex );
+		std::lock_guard<std::mutex> lock( iconListMutex );
 
 		auto i = cmdIconList.find( cmd );
 
@@ -1560,7 +1560,7 @@ namespace wal
 
 		if ( !a.data ) { return; }
 
-		MutexLock lock( &iconCopyMutex );
+		std::lock_guard<std::mutex> lock( iconCopyMutex );
 		data = a.data;
 		data->counter++;
 	}
@@ -1591,7 +1591,7 @@ namespace wal
 	{
 		if ( data )
 		{
-			MutexLock lock( &iconCopyMutex );
+			std::lock_guard<std::mutex> lock( iconCopyMutex );
 			data->counter--;
 
 			if ( data->counter <= 0 ) { delete data; }

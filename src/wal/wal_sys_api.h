@@ -22,6 +22,8 @@
 #endif
 
 #include <errno.h>
+#include <mutex>
+#include <condition_variable>
 
 #include "types.h"
 
@@ -454,30 +456,10 @@ namespace wal
 	struct _thread_info;
 	typedef _thread_info* thread_t;
 
-	typedef CRITICAL_SECTION mutex_t;
-
-	struct cond_t
-	{
-		HANDLE ev[2]; //??volatile
-	};
-
 	int thread_create( thread_t* th, void* ( *f )( void* ), void* arg, bool detached = false );
 	int thread_join( thread_t th, void** val );
 	thread_t thread_self();
 	inline bool thread_equal( thread_t a, thread_t b ) { return a == b; }
-
-	inline int mutex_create( mutex_t* m ) { InitializeCriticalSection( m ); return 0; }
-	inline int mutex_delete( mutex_t* m ) { DeleteCriticalSection( m ); return 0; }
-	inline int mutex_lock( mutex_t* m ) { EnterCriticalSection( m ); return 0; }
-	inline int mutex_trylock( mutex_t* m ) { return TryEnterCriticalSection( m ) ? 0 : EBUSY ; }
-	inline int mutex_unlock( mutex_t* m ) { LeaveCriticalSection( m ); return 0; }
-
-	int cond_create( cond_t* c );
-	int cond_delete( cond_t* c );
-	int cond_wait( cond_t* c, mutex_t* m );
-	int cond_signal( cond_t* c );
-	int cond_broadcast( cond_t* c );
-
 
 //...
 #else
@@ -491,16 +473,6 @@ namespace wal
 	}
 
 	inline int thread_join( thread_t th, void** val ) { return pthread_join( th, val ); }
-	inline int mutex_create( mutex_t* m ) { return pthread_mutex_init( m, 0 ); }
-	inline int mutex_delete( mutex_t* m ) { return pthread_mutex_destroy( m ); }
-	inline int mutex_lock( mutex_t* m ) { return pthread_mutex_lock( m ); }
-	inline int mutex_trylock( mutex_t* m ) { return pthread_mutex_trylock( m ); }
-	inline int mutex_unlock( mutex_t* m ) { return pthread_mutex_unlock( m ); }
-	inline int cond_create( cond_t* c ) { return pthread_cond_init( c, 0 ); }
-	inline int cond_delete( cond_t* c ) { return pthread_cond_destroy( c ); }
-	inline int cond_wait( cond_t* c, mutex_t* m ) { return pthread_cond_wait( c, m ); }
-	inline int cond_signal( cond_t* c ) { return pthread_cond_signal( c );}
-	inline int cond_broadcast( cond_t* c ) { return pthread_cond_broadcast( c );};
 	inline thread_t thread_self() { return pthread_self(); }
 	inline bool thread_equal( thread_t a, thread_t b ) { return pthread_equal( a, b ) != 0; }
 

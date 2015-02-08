@@ -32,7 +32,7 @@ class FtpStatCache
 		Dir(): tim( 0 ) {}
 	};
 
-	Mutex mutex;
+	std::mutex mutex;
 	Dir root;
 	int* pCharset;
 	Dir* GetParent( FSPath& path );
@@ -85,7 +85,7 @@ public:
 
 class FtpIDCollection
 {
-	Mutex mutex;
+	std::mutex mutex;
 	cstrhash<int, unicode_t> byName;
 	ccollect<std::vector<unicode_t> > byId;
 	static unicode_t u0;
@@ -94,13 +94,13 @@ public:
 
 	const unicode_t* GetName( int id )
 	{
-		MutexLock lock( &mutex );
+		std::lock_guard<std::mutex> lock( mutex );
 		return ( id >= 0 && id < byId.count() && byId[id].data() ) ? byId[id].data() : &u0;
 	}
 
 	int GetId( const unicode_t* name )
 	{
-		MutexLock lock( &mutex );
+		std::lock_guard<std::mutex> lock( mutex );
 		int* n = byName.exist( name );
 
 		if ( n ) { return *n; }
@@ -117,14 +117,14 @@ public:
 //++volatile надо скорректировать
 class FSFtp : public FS
 {
-	Mutex infoMutex;
+	std::mutex infoMutex;
 	FSFtpParam _infoParam;
 
 	FtpStatCache statCache; //has own mutex
 	FtpIDCollection uids;   //has own mutex
 	FtpIDCollection gids;   //has own mutex
 
-	Mutex mutex;
+	std::mutex mutex;
 	FSFtpParam _param;
 
 	enum { NODES_COUNT = 32 };
@@ -169,7 +169,7 @@ public:
 	virtual FSString Uri( FSPath& path );
 	virtual ~FSFtp();
 
-	void GetParam( FSFtpParam* p ) { if ( !p ) { return; } MutexLock lock( &infoMutex ); *p = _infoParam; }
+	void GetParam( FSFtpParam* p ) { if ( !p ) { return; } std::lock_guard<std::mutex> lock( infoMutex ); *p = _infoParam; }
 
 	virtual unicode_t* GetUserName( int user, unicode_t buf[64] );
 	virtual unicode_t* GetGroupName( int group, unicode_t buf[64] );
