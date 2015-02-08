@@ -108,13 +108,13 @@ class Terminal
 	Shell _shell;
 
 //input
-	Mutex _inputMutex;
+	std::mutex _inputMutex;
 //	int _maxRows;
 
 //output
 	thread_t outputThread;
-	Mutex _outputMutex;
-	Cond _outputCond;
+	std::mutex _outputMutex;
+	std::condition_variable _outputCond;
 
 	TerminalOutputQueue outQueue;
 
@@ -129,7 +129,7 @@ class Terminal
 public:
 	Terminal( /*int maxRows = MAX_TERM_ROWS*/ );
 
-	Mutex* InputMutex() { return &_inputMutex; }
+	std::mutex& InputMutex() { return _inputMutex; }
 
 private:
 	int SetSize( int r, int c );

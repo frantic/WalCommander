@@ -5,7 +5,7 @@
 namespace FTU
 {
 
-	Mutex mutex;
+	std::mutex mutex;
 	static int libState = -1;
 	static FT_Library  library = 0;
 

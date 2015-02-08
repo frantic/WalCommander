@@ -434,18 +434,18 @@ int Terminal::ReadOutput( char* buf, int size )
 
 void Terminal::Output( const char c )
 {
-	std::lock_guard<std::mutex> lock( &_outputMutex );
+	std::lock_guard<std::mutex> lock( _outputMutex );
 	outQueue.Put( c );
-	_outputCond.Signal();
+	_outputCond.notify_all();
 }
 
 void Terminal::Output( const char* s, int size )
 {
 	if ( size <= 0 ) { return; }
 
-	std::lock_guard<std::mutex> lock( &_outputMutex );
+	std::lock_guard<std::mutex> lock( _outputMutex );
 	outQueue.Put( s, size );
-	_outputCond.Signal();
+	_outputCond.notify_all();
 }
 
 inline void Terminal::OutAppendUnicode( unicode_t c )
@@ -491,32 +491,32 @@ inline void Terminal::OutAppendUnicode( unicode_t c )
 
 void Terminal::UnicodeOutput( const unicode_t c )
 {
-	std::lock_guard<std::mutex> lock( &_outputMutex );
+	std::lock_guard<std::mutex> lock( _outputMutex );
 	OutAppendUnicode( c );
-	_outputCond.Signal();
+	_outputCond.notify_all();
 }
 
 void Terminal::UnicodeOutput( const unicode_t* s, int size )
 {
 	if ( size <= 0 ) { return; }
 
-	std::lock_guard<std::mutex> lock( &_outputMutex );
+	std::lock_guard<std::mutex> lock( _outputMutex );
 
 	for ( ; size > 0; size--, s++ ) { OutAppendUnicode( *s ); }
 
-	_outputCond.Signal();
+	_outputCond.notify_all();
 }
 
 
 void Terminal::TerminalReset( bool clearScreen )
 {
-	std::lock_guard<std::mutex> lock( &_inputMutex );
+	std::lock_guard<std::mutex> lock( _inputMutex );
 	_emulator.Reset( clearScreen );
 }
 
 void Terminal::TerminalPrint( const unicode_t* str, unsigned fg, unsigned bg )
 {
-	std::lock_guard<std::mutex> lock( &_inputMutex );
+	std::lock_guard<std::mutex> lock( _inputMutex );
 	_emulator.InternalPrint( str, fg, bg );
 }
 
@@ -549,7 +549,7 @@ void* TerminalInputThreadFunc( void* data )
 				break; //eof
 			}
 
-			std::lock_guard<std::mutex> lock( &terminal->_inputMutex );
+			std::lock_guard<std::mutex> lock( terminal->_inputMutex );
 
 			for ( int i = 0; i < n; i++ )
 			{
@@ -574,18 +574,19 @@ void* TerminalOutputThreadFunc( void* data )
 	{
 		while ( true )
 		{
-			terminal->_outputMutex.Lock();
+			int bytes = 0;
 			char buffer[0x100];
-			int bytes = terminal->ReadOutput( buffer, sizeof( buffer ) );
 
-			if ( bytes <= 0 )
 			{
-				terminal->_outputCond.Wait( &terminal->_outputMutex );
-				terminal->_outputMutex.Unlock();
-				continue;
-			}
+				std::unique_lock<std::mutex> lock( terminal->_outputMutex );
+				bytes = terminal->ReadOutput( buffer, sizeof( buffer ) );
 
-			terminal->_outputMutex.Unlock();
+				if ( bytes <= 0 )
+				{
+					terminal->_outputCond.wait( lock );
+					continue;
+				}
+			}
 
 			char* p = buffer;
 

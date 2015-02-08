@@ -366,7 +366,7 @@ void TerminalWin::ThreadSignal( int id, int data )
 {
 //	printf("terminal thread signal id=%i, data=%i\n", id, data);
 
-	std::lock_guard<std::mutex> lock( _terminal.InputMutex() );
+	std::unique_lock<std::mutex> lock( _terminal.InputMutex() );
 
 
 	bool calcScroll = false;
